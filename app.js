@@ -1,4 +1,5 @@
-const SyncServer = require('./WebSocketSyncServer');
-const server = new SyncServer(8080);
+// const SyncServer = require('./WebSocketSyncServer web');
+const SyncServer = require('./WebSocketSyncServer app');
+const server = new SyncServer(8001);
 
 server.start();
