@@ -161,6 +161,34 @@ function SyncServer(port) {
                 syncedRevision = currentRevision; // Make sure we only send revisions coming after this revision next time and not resend the above changes over and over.
             }
 
+           
+
+            function sendDBChanges() {
+                // Get all changes after syncedRevision that was not performed by the client we're talkin' to.
+                // var changes = db.changes.filter(function (change) { return change.rev > syncedRevision && change.source !== conn.clientIdentity; });
+                // // Compact changes so that multiple changes on same object is merged into a single change.
+                // var reducedSet = reduceChanges(changes, conn.clientIdentity);
+                // // Convert the reduced set into an array again.
+                // var reducedArray = Object.keys(reducedSet).map(function (key) { return reducedSet[key]; });
+                // // Notice the current revision of the database. We want to send it to client so it knows what to ask for next time.
+                // var currentRevision = db.revision;
+
+                conn.sendText(JSON.stringify({
+                    type: "dbChanges"
+                //    changes: reducedArray,
+                //    currentRevision: currentRevision,
+                //    partial: false // Tell client that these are the only changes we are aware of. Since our mem DB is syncronous, we got all changes in one chunk.
+                }));
+
+                // syncedRevision = currentRevision; // Make sure we only send revisions coming after this revision next time and not resend the above changes over and over.
+            }
+
+            setInterval(() => {
+                // console.log("backend hello");
+                // sendDBChanges();
+                db.subscribe(sendDBChanges());
+            }, 1000);
+
             conn.on("text", function (message) {
                 var request = JSON.parse(message);
                 var type = request.type;
@@ -320,7 +348,9 @@ function SyncServer(port) {
             });
 
             oplog.on('update', doc => {
-                // console.log('update: ', doc);
+                console.log('update: ', doc);
+                dbObject = doc.ns.split('.');
+                db.update(dbObject[1], doc.o._id, doc.o, "subscribe");
             });
 
             oplog.on('delete', doc => {
