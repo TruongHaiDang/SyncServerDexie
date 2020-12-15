@@ -15,6 +15,8 @@ Webocket server that can be used as a template for how to implement a sync serve
 var ws = require("nodejs-websocket"); // This will work also in browser if "websocketserver-shim.js" is included.
 const axios = require('axios').default;
 const Mongo = require("./mongo");
+const MongoOplog = require('mongo-oplog');
+const oplog = MongoOplog('mongodb://127.0.0.1:27017/local');
 const mongo = new Mongo();
 
 // CREATE / UPDATE / DELETE constants:
@@ -302,6 +304,40 @@ function SyncServer(port) {
                 // When client disconnects, stop subscribing from db.
                 db.unsubscribe(sendAnyChanges);
             });
+
+            /**
+             * Syncing with mongodb
+             */
+
+            // oplog.tail().then(() => {
+            //     console.log('Tailing started')
+            // }).catch(err => console.error(err))
+
+            // oplog.on('insert', doc => {
+            //     console.log('insert: ', doc);
+            //     conn.sendText(JSON.stringify(doc.o));
+            // });
+
+            // oplog.on('update', doc => {
+            //     // console.log('update: ', doc);
+            // });
+
+            // oplog.on('delete', doc => {
+            //     // console.log('delete: ', doc.o._id);
+            // });
+
+            // oplog.on('error', error => {
+            //     console.log(error);
+            // });
+
+            // oplog.on('end', () => {
+            //     console.log('Stream ended');
+            // });
+
+            // oplog.stop(() => {
+            //     console.log('server stopped');
+            // });
+
         }).listen(port, () => console.log(`Socket is listening on port ${port}`));
     }
 }
