@@ -6,8 +6,8 @@ Webocket server that can be used as a template for how to implement a sync serve
     the Dexie.Syncable specification; The rules of thumb for conflict handling is that:
         1. Client- and server state must be exact the same after a sync operation.
         2. Server changes are applied after client changes - thereby winning over the latter except when client
-           already has deleted an object - then the server update wont affect any object since it doesnt exist
-           on client.
+            already has deleted an object - then the server update wont affect any object since it doesnt exist
+            on client.
     In this code, the resolveConflicts() function handles changes on the server AS IF the server changes where
     applied after client changes.
  */
@@ -15,9 +15,9 @@ Webocket server that can be used as a template for how to implement a sync serve
 var ws = require("nodejs-websocket"); // This will work also in browser if "websocketserver-shim.js" is included.
 const axios = require('axios').default;
 const Mongo = require("./mongo");
-const MongoOplog = require('mongo-oplog');
-const oplog = MongoOplog('mongodb://127.0.0.1:27017/local');
-const mongo = new Mongo();
+// const MongoOplog = require('mongo-oplog');
+// const oplog = MongoOplog('mongodb://127.0.0.1:27017/local');
+const mongo = new Mongo({ useUnifiedTopology: true });
 
 // CREATE / UPDATE / DELETE constants:
 var CREATE = 1,
@@ -135,6 +135,7 @@ function SyncServer(port) {
     // ----------------------------------------------------------------------------
 
     var nextClientIdentity = 1;
+    // var isSync;
 
     this.start = function () {
         ws.createServer(function (conn) {
@@ -161,33 +162,19 @@ function SyncServer(port) {
                 syncedRevision = currentRevision; // Make sure we only send revisions coming after this revision next time and not resend the above changes over and over.
             }
 
-           
+            /**
+             * This function is a socket for server to send a message to client
+             * to call this function use: db.subscribe(sendDBChanges());
+             */
 
-            function sendDBChanges() {
-                // Get all changes after syncedRevision that was not performed by the client we're talkin' to.
-                // var changes = db.changes.filter(function (change) { return change.rev > syncedRevision && change.source !== conn.clientIdentity; });
-                // // Compact changes so that multiple changes on same object is merged into a single change.
-                // var reducedSet = reduceChanges(changes, conn.clientIdentity);
-                // // Convert the reduced set into an array again.
-                // var reducedArray = Object.keys(reducedSet).map(function (key) { return reducedSet[key]; });
-                // // Notice the current revision of the database. We want to send it to client so it knows what to ask for next time.
-                // var currentRevision = db.revision;
+            // function sendDBChanges() {
+            //     conn.sendText(JSON.stringify({
+            //         type: "dbChanges"
 
-                conn.sendText(JSON.stringify({
-                    type: "dbChanges"
-                //    changes: reducedArray,
-                //    currentRevision: currentRevision,
-                //    partial: false // Tell client that these are the only changes we are aware of. Since our mem DB is syncronous, we got all changes in one chunk.
-                }));
+            //     }));
+            // }
 
-                // syncedRevision = currentRevision; // Make sure we only send revisions coming after this revision next time and not resend the above changes over and over.
-            }
-
-            setInterval(() => {
-                // console.log("backend hello");
-                // sendDBChanges();
-                db.subscribe(sendDBChanges());
-            }, 1000);
+            
 
             conn.on("text", function (message) {
                 var request = JSON.parse(message);
@@ -281,28 +268,33 @@ function SyncServer(port) {
                                     case CREATE:
                                         {
                                             db.create(change.table, change.key, change.obj, conn.clientIdentity);
+                                            console.log('insert obj', change);
                                             mongo.addDocs("To-Do-List", change.table, change.obj)
                                                 .then(result => {
-                                                    console.log(result)
+                                                    console.log('insert result:', result);
+                                                    // isSync = false
                                                 })
                                             break;
                                         }
                                     case UPDATE:
                                         {
                                             db.update("To-Do-List", change.key, change.mods, conn.clientIdentity);
-                                            console.log(change);
+                                            console.log('update obj', change);
                                             mongo.updateDocs("To-Do-List", change.table, {_id: change.key}, change.mods)
                                                 .then(result => {
-                                                    console.log(result)
+                                                    console.log('update result', result);
+                                                    // isSync = false
                                                 })
                                             break;
                                         }
                                     case DELETE:
                                         {
                                             db.delete("To-Do-List", change.key, conn.clientIdentity);
+                                            console.log('delete obj', change);
                                             mongo.deleteDocs("To-Do-List", change.table, {_id: change.key})
                                                 .then(result => {
-                                                    console.log(result)
+                                                    console.log('delete result', result);
+                                                    // isSync = false
                                                 })
                                             break;
                                         }
@@ -334,40 +326,49 @@ function SyncServer(port) {
             });
 
             /**
-             * Syncing with mongodb
+             * Syncing with mongodb using oplog
              */
 
-            oplog.tail().then(() => {
-                console.log('Tailing started')
-            }).catch(err => console.error(err))
+            // oplog.tail().then(() => {
+            //     console.log('Tailing started')
+            // }).catch(err => console.error(err))
 
-            oplog.on('insert', doc => {
-                console.log('insert: ', doc);
-                dbObject = doc.ns.split('.');
-                db.create(dbObject[1], doc.o._id, doc.o, "subscribe");
-            });
+            // oplog.on('insert', doc => {
+            //     if(isSync) {
+            //         console.log('oplog-insert: ', doc);
+            //     }
+            //     isSync = true;
+            //     // dbObject = doc.ns.split('.');
+            //     // db.create(dbObject[1], doc.o._id, doc.o, "subscribe");
+            // });
 
-            oplog.on('update', doc => {
-                console.log('update: ', doc);
-                dbObject = doc.ns.split('.');
-                db.update(dbObject[1], doc.o._id, doc.o, "subscribe");
-            });
+            // oplog.on('update', doc => {
+            //     if(isSync) {
+            //         console.log('oplog-update: ', doc);
+            //     }
+            //     isSync = true;
+            //     // dbObject = doc.ns.split('.');
+            //     // db.update(dbObject[1], doc.o._id, doc.o, "subscribe");
+            // });
 
-            oplog.on('delete', doc => {
-                // console.log('delete: ', doc.o._id);
-            });
+            // oplog.on('delete', doc => {
+            //     if(isSync) {
+            //         console.log('oplog-delete: ', doc);
+            //     }
+            //     isSync = true;
+            // });
 
-            oplog.on('error', error => {
-                console.log(error);
-            });
+            // oplog.on('error', error => {
+            //     console.log('oplog-error: ', error);
+            // });
 
-            oplog.on('end', () => {
-                console.log('Stream ended');
-            });
+            // oplog.on('end', () => {
+            //     console.log('Stream ended');
+            // });
 
-            oplog.stop(() => {
-                console.log('server stopped');
-            });
+            // oplog.stop(() => {
+            //     console.log('server stopped');
+            // });
 
         }).listen(port, () => console.log(`Socket is listening on port ${port}`));
     }

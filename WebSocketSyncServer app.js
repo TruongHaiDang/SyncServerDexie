@@ -15,8 +15,8 @@ Webocket server that can be used as a template for how to implement a sync serve
 var ws = require("nodejs-websocket"); // This will work also in browser if "websocketserver-shim.js" is included.
 const axios = require('axios').default;
 const Mongo = require("./mongo");
-const MongoOplog = require('mongo-oplog');
-const oplog = MongoOplog('mongodb://127.0.0.1:27017/local');
+// const MongoOplog = require('mongo-oplog');
+// const oplog = MongoOplog('mongodb://127.0.0.1:27017/local');
 const mongo = new Mongo();
 
 // CREATE / UPDATE / DELETE constants:
