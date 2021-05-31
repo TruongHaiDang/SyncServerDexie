@@ -13,7 +13,7 @@
     "mongo-oplog": "^2.1.4",
     "mongodb": "^3.6.3",
     "nodejs-websocket": "^1.7.2",
-    "ws": "^7.4.1"
+    "ws": "^7.4.6"
   },
   "devDependencies": {
     "nodemon": "^2.0.6"
